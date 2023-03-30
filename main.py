@@ -188,7 +188,7 @@ class FastScanner:
             from_airport_code = self.from_airport["Id"]
         else:
             from_airport_code = self.from_place["PlaceId"]
-            
+
         to_airport_code = self.to_airport["Id"]
         api_url = f'https://www.skyscanner.net/g/monthviewservice/LT/EUR/en-GB/calendar/{from_airport_code}/{to_airport_code}/cheapest/cheapest/?abvariant=rts_who_precompute:a&apikey=6f4cb8367f544db99cd1e2ea86fb2627'
         
@@ -378,4 +378,4 @@ class FastScanner:
     
         
 scanner = FastScanner()
-scanner.scan(calendar_scan=True)
+scanner.scan(calendar_scan=False)
