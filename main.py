@@ -2,6 +2,7 @@ import json
 import requests
 from datetime import datetime as date
 from time import sleep
+import os
 
 class FastScanner:
     COUNTRY_CODE_API = 'https://gist.githubusercontent.com/anubhavshrimal/75f6183458db8c453306f93521e93d37/raw/f77e7598a8503f1f70528ae1cbf9f66755698a16/CountryCodes.json'
@@ -9,8 +10,9 @@ class FastScanner:
 
 
     def __init__(self):
-        self.from_country = {}
-        self.to_country = {}
+        self.from_place = {}
+        self.to_place = {}
+        self.country_selected = False
         self.from_airport = {}
         self.to_airport = {}
         self.flight_details = []
@@ -18,10 +20,12 @@ class FastScanner:
     def scan(self, calendar_scan = False) -> None:
         """Main function.\n
         calendar_scan: Extensively scans the flight calendar for all recorded flight possibilies to a specific destination starting from current month (default scans prices only for the cheapest month)"""
-        self.from_country = self.select_from_country()
-        self.to_country = self.select_to_country()
+
+        self.from_place = self.select_from_place()
+        self.to_place = self.select_to_place()
         self.to_airport = self.select_to_airport()
-        self.from_airport = self.select_from_airport()
+        if self.country_selected:
+            self.from_airport = self.select_from_airport()
 
         if calendar_scan == True:
             # custom functionality to scan the full calendar of a flight to a specific destination
@@ -29,33 +33,51 @@ class FastScanner:
         else:
             self.flight_details = self.select_flight_dates()
         self.output_flight_url()
-
-    def select_from_country(self) -> dict:
-        # Request country codes
-        res = requests.get(FastScanner.COUNTRY_CODE_API, headers=FastScanner.HEADERS)
-        countries = json.loads(res.text)
+    
+    def select_from_place(self) -> dict:
+        os.system('cls' if os.name == 'nt' else 'clear')
         while True:
-            search = str(input("Enter your country code or country name: ")).strip().lower()
-            for country in countries:
-                if country["code"].lower() == search or country["name"].lower() == search:
-                    # add country object as class instance variable
-                    print(country)
-                    return country
-            print("Country code not found. Try again.")
+            search_query = input("Enter country code, country name, county or airport: ")
+            #skyscanner search api
+            api_url = f"https://www.skyscanner.net/g/autosuggest-search/api/v1/search-flight/UK/en-GB/{search_query}?isDestination=false&enable_general_search_v2=false"
+            res = requests.get(api_url, headers=FastScanner.HEADERS)
+            search_results = json.loads(res.text)
 
-    def select_to_country(self) -> dict:
-        from_country_code = self.from_country['code']
+            search_results.reverse()
+            count = len(search_results)
+
+            if len(search_results) == 0:
+                print("No results were found. Maybe try something simpler?")
+                continue
+
+            for result in search_results:
+                print((str(count) + ".").ljust(5), ", ".join(result['ResultingPhrase'].split("|")))
+                count -= 1
+            select_flight_origin = -1
+            while True:
+                select_flight_origin = int(input("Select a result by entering a number (or enter 0 to change your search query): ")) - 1
+                if select_flight_origin == -1:
+                    break
+                if select_flight_origin in range(0, len(search_results)):
+                    search_results.reverse()
+                    print(search_results[select_flight_origin])
+                    if search_results[select_flight_origin]["PlaceName"] == search_results[select_flight_origin]["CountryName"]:
+                        self.country_selected = True
+                    return search_results[select_flight_origin]
+
+    def select_to_place(self) -> dict:
+        from_place_code = self.from_place['PlaceId']
         #skyscanner API
-        api_url = f'https://www.skyscanner.net/g/browse-view-bff/dataservices/browse/v3/bvweb/UK/EUR/en-GB/destinations/{from_country_code}/anywhere/anytime/anytime/?apikey=8aa374f4e28e4664bf268f850f767535'
+        api_url = f'https://www.skyscanner.net/g/browse-view-bff/dataservices/browse/v3/bvweb/UK/EUR/en-GB/destinations/{from_place_code}/anywhere/anytime/anytime/?apikey=8aa374f4e28e4664bf268f850f767535'
         res = requests.get(api_url, headers=FastScanner.HEADERS)
         data = self.parse_skyscanner_api(json.loads(res.text))
 
         self.print_api_results(data)
 
-        country_name = self.from_country["name"]
+        place_name = self.from_place["PlaceName"]
 
         while True:
-            selected_id = int(input(f"Select country you want to fly to from {country_name} (enter number): ")) - 1
+            selected_id = int(input(f"Select country you want to fly to from {place_name} (enter number): ")) - 1
             if selected_id in range(0,len(data["PlacePrices"])):
                 break
         data["PlacePrices"].reverse()
@@ -113,26 +135,24 @@ class FastScanner:
             count-=1
     
     def select_to_airport(self) -> dict:
-        if self.from_country == {}:
-            self.select_from_country()
-        if self.to_country == {}:
-            self.select_to_country()
+        if self.from_place == {}:
+            self.select_from_place()
+        if self.to_place == {}:
+            self.select_to_place()
         
-        # outbound country code is received from a non skyscanner API (that is why the keys are different)
-        from_country_code = self.from_country['code'].upper()
-        to_country_code = self.to_country['Id']
-        #skyscanner API
-        api_url = f'https://www.skyscanner.net/g/browse-view-bff/dataservices/browse/v3/bvweb/UK/EUR/en-GB/destinations/{from_country_code}/{to_country_code}/anytime/anytime/?profile=minimalcityrollupwithnamesv2&include=image;hotel;adverts&apikey=8aa374f4e28e4664bf268f850f767535&isMobilePhone=false&isOptedInForPersonalised=false'
+        from_place_code = self.from_place['PlaceId']
+        to_place_code = self.to_place['Id']
+        api_url = f'https://www.skyscanner.net/g/browse-view-bff/dataservices/browse/v3/bvweb/UK/EUR/en-GB/destinations/{from_place_code}/{to_place_code}/anytime/anytime/?profile=minimalcityrollupwithnamesv2&include=image;hotel;adverts&apikey=8aa374f4e28e4664bf268f850f767535&isMobilePhone=false&isOptedInForPersonalised=false'
         res = requests.get(api_url, headers=FastScanner.HEADERS)
 
         data = self.parse_skyscanner_api(json.loads(res.text))
 
         self.print_api_results(data)
 
-        country_name = self.to_country["Name"]
+        place_name = self.to_place["Name"]
 
         while True:
-            selected_id = int(input(f"Select an airport in {country_name} you want to fly to (enter number): ")) - 1
+            selected_id = int(input(f"Select an airport in {place_name} you want to fly to (enter number): ")) - 1
             if selected_id in range(0,len(data["PlacePrices"])):
                 break
         data["PlacePrices"].reverse()
@@ -142,19 +162,19 @@ class FastScanner:
 
     def select_from_airport(self) -> dict:
         #skyscanner API
-        from_country_code = self.from_country['code'].upper()
+        from_place_code = self.from_place['PlaceId']
         to_airport_code = self.to_airport["Id"]
-        api_url = f'https://www.skyscanner.net/g/browse-view-bff/dataservices/browse/v3/bvweb/UK/EUR/en-GB/origins/{from_country_code}/{to_airport_code}/anytime/anytime/?profile=minimalcityrollupwithnamesv2&include=image;hotel;adverts&apikey=8aa374f4e28e4664bf268f850f767535&isMobilePhone=false&isOptedInForPersonalised=false'
+        api_url = f'https://www.skyscanner.net/g/browse-view-bff/dataservices/browse/v3/bvweb/UK/EUR/en-GB/origins/{from_place_code}/{to_airport_code}/anytime/anytime/?profile=minimalcityrollupwithnamesv2&include=image;hotel;adverts&apikey=8aa374f4e28e4664bf268f850f767535&isMobilePhone=false&isOptedInForPersonalised=false'
         res = requests.get(api_url, headers=FastScanner.HEADERS)
 
         data = self.parse_skyscanner_api(json.loads(res.text))
 
         self.print_api_results(data)
 
-        country_name = self.from_country['name']
+        place_name = self.from_place['PlaceName']
 
         while True:
-            selected_id = int(input(f"Select an airport in {country_name} you want to fly from (enter number): ")) - 1
+            selected_id = int(input(f"Select an airport in {place_name} you want to fly from (enter number): ")) - 1
             if selected_id in range(0,len(data["PlacePrices"])):
                 break
         data["PlacePrices"].reverse()
@@ -164,7 +184,11 @@ class FastScanner:
     
     def select_flight_dates(self) -> dict:
         """Scans only the cheapest month (deemed by Skyscanner) for prices to a specific destination"""
-        from_airport_code = self.from_airport["Id"]
+        if self.country_selected:
+            from_airport_code = self.from_airport["Id"]
+        else:
+            from_airport_code = self.from_place["PlaceId"]
+            
         to_airport_code = self.to_airport["Id"]
         api_url = f'https://www.skyscanner.net/g/monthviewservice/LT/EUR/en-GB/calendar/{from_airport_code}/{to_airport_code}/cheapest/cheapest/?abvariant=rts_who_precompute:a&apikey=6f4cb8367f544db99cd1e2ea86fb2627'
         
@@ -222,7 +246,10 @@ class FastScanner:
 
     def scan_calendar(self) -> dict:
         """Extensively scans the flight calendar for all recorded flight possibilies to a specific destination starting from current month"""
-        from_airport_code = self.from_airport["Id"]
+        if self.country_selected:
+            from_airport_code = self.from_airport["Id"]
+        else:
+            from_airport_code = self.from_place["PlaceId"]
         to_airport_code = self.to_airport["Id"]
         from_date = date.today().strftime("%Y-%m")
         to_date = date.today().strftime("%Y-%m")
@@ -311,7 +338,11 @@ class FastScanner:
         return found_flights[selected_id]
     
     def output_flight_url(self) -> None:
-        from_airport_code = self.from_airport["Id"]
+        if self.country_selected:
+            from_airport_code = self.from_airport["Id"]
+        else:
+            from_airport_code = self.from_place["PlaceId"]
+
         to_airport_code = self.to_airport["Id"]
         # format date to proper url
         from_date = self.flight_details["from_info"][4][2:]
@@ -347,4 +378,4 @@ class FastScanner:
     
         
 scanner = FastScanner()
-scanner.scan(calendar_scan=False)
+scanner.scan(calendar_scan=True)
