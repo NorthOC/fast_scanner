@@ -190,7 +190,7 @@ class FastScanner:
             from_airport_code = self.from_place["PlaceId"]
 
         to_airport_code = self.to_airport["Id"]
-        api_url = f'https://www.skyscanner.net/g/monthviewservice/LT/EUR/en-GB/calendar/{from_airport_code}/{to_airport_code}/cheapest/cheapest/?abvariant=rts_who_precompute:a&apikey=6f4cb8367f544db99cd1e2ea86fb2627'
+        api_url = f'https://www.skyscanner.net/g/monthviewservice/UK/EUR/en-GB/calendar/{from_airport_code}/{to_airport_code}/cheapest/cheapest/?abvariant=rts_who_precompute:a&apikey=6f4cb8367f544db99cd1e2ea86fb2627'
         
         res = requests.get(api_url, headers=FastScanner.HEADERS)
         data = json.loads(res.text)
@@ -279,7 +279,7 @@ class FastScanner:
             to_date = to_date_obj["year"] + "-" + to_date_obj["month"]
             print(f"Scanning flight prices for flight {from_airport_code}-{to_airport_code}:", from_date, "-", to_date)
             
-            api_url = f'https://www.skyscanner.net/g/monthviewservice/LT/EUR/en-GB/calendar/{from_airport_code}/{to_airport_code}/{from_date}/{to_date}/?abvariant=rts_who_precompute:a&apikey=6f4cb8367f544db99cd1e2ea86fb2627'
+            api_url = f'https://www.skyscanner.net/g/monthviewservice/UK/EUR/en-GB/calendar/{from_airport_code}/{to_airport_code}/{from_date}/{to_date}/?abvariant=rts_who_precompute:a&apikey=6f4cb8367f544db99cd1e2ea86fb2627'
             res = requests.get(api_url, headers=FastScanner.HEADERS)
             data = json.loads(res.text)
             sleep(1.5)
